@@ -105,8 +105,8 @@ function AuditLog({ data }) {
         {data.map(l => (
           <tr key={l._id} style={s.tr}>
             <td style={s.td}>{new Date(l.timestamp).toLocaleString()}</td>
-            <td style={s.td}>{l.userId?.username || '—'}</td>
-            <td style={s.td}>{l.userId?.role || '—'}</td>
+            <td style={s.td}>{l.username || '—'}</td>
+            <td style={s.td}>{l.role || '—'}</td>
             <td style={s.td}><span style={{ color:'#e94560' }}>{l.actionType}</span></td>
             <td style={s.td}>{l.affectedEntity}</td>
             <td style={s.td}>{l.affectedId || '—'}</td>

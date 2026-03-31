@@ -1,12 +1,19 @@
 const router = require('express').Router();
-const Position = require('../models/Position');
-const { protect } = require('../middleware/auth');
+const { getPool, sql } = require('../config/db');
+const { protect }   = require('../middleware/auth');
 const { authorize } = require('../middleware/roles');
 
-router.get('/', protect, async (req, res) => res.json(await Position.find()));
+router.get('/', protect, async (req, res) => {
+  const pool = await getPool();
+  res.json((await pool.request().query('SELECT PositionID AS _id, PositionID, PositionName FROM Position')).recordset);
+});
 
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
-  res.status(201).json(await Position.create(req.body));
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('name', sql.VarChar(50), req.body.positionName)
+    .query('INSERT INTO Position (PositionName) OUTPUT INSERTED.* VALUES (@name)');
+  res.status(201).json(result.recordset[0]);
 });
 
 module.exports = router;

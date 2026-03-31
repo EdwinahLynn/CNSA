@@ -40,11 +40,11 @@ export default function Games() {
   };
 
   const openEdit = (g) => {
-    setForm({ homeTeamId: g.homeTeamId?._id||g.homeTeamId, awayTeamId: g.awayTeamId?._id||g.awayTeamId, stadiumId: g.stadiumId?._id||g.stadiumId, gameDate: g.gameDate?.slice(0,10)||'', homeTeamScore: g.homeTeamScore, awayTeamScore: g.awayTeamScore, attendance: g.attendance||'' });
+    setForm({ homeTeamId: g.homeTeamId, awayTeamId: g.awayTeamId, stadiumId: g.stadiumId, gameDate: g.gameDate?.slice(0,10)||'', homeTeamScore: g.homeTeamScore, awayTeamScore: g.awayTeamScore, attendance: g.attendance||'' });
     setEditId(g._id); setShowForm(true);
   };
 
-  const teamLabel = (t) => `${t.schoolId?.schoolName||'?'} (${t.gender} · ${t.season})`;
+  const teamLabel = (t) => `${t.schoolName||'?'} (${t.gender} · ${t.season})`;
 
   return (
     <div style={s.page}>
@@ -59,10 +59,10 @@ export default function Games() {
           {games.map(g => (
             <tr key={g._id} style={s.tr}>
               <td style={s.td}>{new Date(g.gameDate).toLocaleDateString()}</td>
-              <td style={s.td}>{g.homeTeamId?.schoolId?.schoolName || '—'}</td>
-              <td style={s.td}>{g.awayTeamId?.schoolId?.schoolName || '—'}</td>
+              <td style={s.td}>{g.homeSchool || '—'}</td>
+              <td style={s.td}>{g.awaySchool || '—'}</td>
               <td style={s.td}><strong style={{ color:'#e94560' }}>{g.homeTeamScore} – {g.awayTeamScore}</strong></td>
-              <td style={s.td}>{g.stadiumId?.stadiumName || '—'}</td>
+              <td style={s.td}>{g.stadiumName || '—'}</td>
               <td style={s.td}>{g.attendance?.toLocaleString() || '—'}</td>
               <td style={s.td}>{canWrite && <button onClick={() => openEdit(g)} style={s.smBtn}>Edit</button>}</td>
             </tr>

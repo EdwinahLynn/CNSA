@@ -7,22 +7,27 @@ import { s } from '../styles/shared.js';
 
 const EMPTY = { firstName: '', lastName: '', sex: 'M', phoneNumber: '', email: '',
   streetAddress: '', postalCode: '', cityName: '', provinceName: '',
-  schoolId: '', status: 'Active', recruitingRank: '', highSchool: '', recruitingIncidents: '' };
+  schoolId: '', status: 'Active', recruitingRank: '', highSchool: '',
+  recruitingIncidents: '', positionIds: [], coachId: '' };
 
 export default function Players() {
   const { user } = useAuth();
-  const [players, setPlayers]   = useState([]);
-  const [schools, setSchools]   = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState(EMPTY);
-  const [editId, setEditId]     = useState(null);
-  const [search, setSearch]     = useState('');
+  const [players, setPlayers]     = useState([]);
+  const [schools, setSchools]     = useState([]);
+  const [coaches, setCoaches]     = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [showForm, setShowForm]   = useState(false);
+  const [form, setForm]           = useState(EMPTY);
+  const [editId, setEditId]       = useState(null);
+  const [search, setSearch]       = useState('');
 
   const canWrite = ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'].includes(user?.role);
 
   useEffect(() => {
     api.get('/players').then(r => setPlayers(r.data));
     api.get('/schools').then(r => setSchools(r.data));
+    api.get('/coaches').then(r => setCoaches(r.data));
+    api.get('/positions').then(r => setPositions(r.data));
   }, []);
 
   const filtered = players.filter(p =>
@@ -41,9 +46,10 @@ export default function Players() {
       phoneNumber: p.phoneNumber || '', email: p.email || '',
       streetAddress: p.streetAddress, postalCode: p.postalCode,
       cityName: p.cityName, provinceName: p.provinceName,
-      schoolId: p.schoolId?._id || p.schoolId,
+      schoolId: p.schoolId, coachId: p.coachId || '',
       status: p.status, recruitingRank: p.recruitingRank || '',
-      highSchool: p.highSchool || '', recruitingIncidents: p.recruitingIncidents || ''
+      highSchool: p.highSchool || '', recruitingIncidents: p.recruitingIncidents || '',
+      positionIds: p.positionIds || []
     });
     setEditId(p._id);
     setShowForm(true);
@@ -89,15 +95,16 @@ export default function Players() {
 
       <table style={s.table}>
         <thead>
-          <tr>{['Name','School','Status','Position','Rank',''].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+          <tr>{['Name','School','Coach','Status','Position','Rank',''].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
         </thead>
         <tbody>
           {filtered.map(p => (
             <tr key={p._id} style={s.tr}>
               <td style={s.td}><Link to={`/players/${p._id}`} style={{ color: '#e94560' }}>{p.firstName} {p.lastName}</Link></td>
-              <td style={s.td}>{p.schoolId?.schoolName || '—'}</td>
+              <td style={s.td}>{p.schoolName || '—'}</td>
+              <td style={s.td}>{p.coachFirstName ? `${p.coachFirstName} ${p.coachLastName}` : '—'}</td>
               <td style={s.td}><StatusBadge status={p.status} /></td>
-              <td style={s.td}>{p.positions?.map(pos => pos.positionName).join(', ') || '—'}</td>
+              <td style={s.td}>{p.positions || '—'}</td>
               <td style={s.td}>{p.recruitingRank || '—'}</td>
               <td style={s.td}>
                 {canWrite && (
@@ -130,11 +137,44 @@ export default function Players() {
             <Field label="Postal Code"   value={form.postalCode}   onChange={v => setForm({...form, postalCode: v})}   required />
             <Field label="High School"   value={form.highSchool}   onChange={v => setForm({...form, highSchool: v})} />
             <Field label="Recruiting Rank" type="number" value={form.recruitingRank} onChange={v => setForm({...form, recruitingRank: v})} />
-            <Field label="School" type="select" value={form.schoolId} onChange={v => setForm({...form, schoolId: v})}
+            <Field label="School" type="select" value={form.schoolId} onChange={v => setForm({...form, schoolId: v, coachId: ''})}
               options={schools.map(s => ({ value: s._id, label: s.schoolName }))} required
               disabled={user?.role !== 'CNSA_ADMIN'} />
+            <div>
+              <label style={s.label}>Coach</label>
+              <select
+                value={user?.role === 'COACH' ? (user.coachId || '') : form.coachId}
+                onChange={e => setForm({...form, coachId: e.target.value})}
+                style={s.input}
+                disabled={user?.role === 'COACH'}
+              >
+                <option value="">-- None --</option>
+                {coaches
+                  .filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId))
+                  .map(c => <option key={c._id} value={c._id}>{c.firstName} {c.lastName}</option>)}
+              </select>
+              {user?.role === 'COACH' && <p style={{ color:'#888', fontSize:'0.75rem', margin:'0.25rem 0 0' }}>Auto-assigned to you</p>}
+            </div>
             <Field label="Status" type="select" value={form.status} onChange={v => setForm({...form, status: v})}
               options={['Active','Graduated','Inactive']} required />
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={s.label}>Positions</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+                {positions.map(pos => (
+                  <label key={pos._id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ccc', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.positionIds.includes(pos._id)}
+                      onChange={e => setForm({ ...form, positionIds: e.target.checked
+                        ? [...form.positionIds, pos._id]
+                        : form.positionIds.filter(id => id !== pos._id)
+                      })}
+                    />
+                    {pos.positionName}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={s.label}>Recruiting Incidents</label>
               <textarea value={form.recruitingIncidents} onChange={e => setForm({...form, recruitingIncidents: e.target.value})} style={{ ...s.input, height: '80px' }} />

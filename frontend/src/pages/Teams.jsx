@@ -38,7 +38,7 @@ export default function Teams() {
   };
 
   const openEdit = (t) => {
-    setForm({ schoolId: t.schoolId?._id||t.schoolId, coachId: t.coachId?._id||t.coachId, season: t.season, gender: t.gender });
+    setForm({ schoolId: t.schoolId, coachId: t.coachId, season: t.season, gender: t.gender });
     setEditId(t._id); setShowForm(true);
   };
 
@@ -54,12 +54,12 @@ export default function Teams() {
           <div key={t._id} style={s.card}>
             <div style={localStyles.cardTop}>
               <div>
-                <h3 style={s.cardTitle}>{t.schoolId?.schoolName}</h3>
+                <h3 style={s.cardTitle}>{t.schoolName}</h3>
                 <p style={s.cardMeta}>{t.gender} · {t.season}</p>
               </div>
               {canWrite && <button onClick={() => openEdit(t)} style={s.smBtn}>Edit</button>}
             </div>
-            <p style={s.cardMeta}>Coach: {t.coachId ? `${t.coachId.firstName} ${t.coachId.lastName}` : '—'}</p>
+            <p style={s.cardMeta}>Coach: {t.coachFirstName ? `${t.coachFirstName} ${t.coachLastName}` : '—'}</p>
             <p style={s.cardMeta}>Players: {t.players?.length || 0}</p>
           </div>
         ))}
@@ -70,7 +70,7 @@ export default function Teams() {
           <form onSubmit={handleSubmit} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
             <div>
               <label style={s.label}>School *</label>
-              <select value={form.schoolId} onChange={e => setForm({...form,schoolId:e.target.value})} style={s.input} required disabled={user?.role !== 'CNSA_ADMIN'}>
+              <select value={form.schoolId} onChange={e => setForm({...form,schoolId:e.target.value,coachId:''})} style={s.input} required disabled={user?.role !== 'CNSA_ADMIN'}>
                 <option value="">-- Select --</option>
                 {schools.map(sc => <option key={sc._id} value={sc._id}>{sc.schoolName}</option>)}
               </select>
@@ -79,7 +79,7 @@ export default function Teams() {
               <label style={s.label}>Coach *</label>
               <select value={form.coachId} onChange={e => setForm({...form,coachId:e.target.value})} style={s.input} required>
                 <option value="">-- Select --</option>
-                {coaches.filter(c => !form.schoolId || (c.schoolId?._id||c.schoolId) === form.schoolId).map(c => <option key={c._id} value={c._id}>{c.firstName} {c.lastName}</option>)}
+                {coaches.filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId)).map(c => <option key={c._id} value={c._id}>{c.firstName} {c.lastName}</option>)}
               </select>
             </div>
             <div>

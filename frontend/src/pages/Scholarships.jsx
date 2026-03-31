@@ -34,7 +34,7 @@ export default function Scholarships() {
   };
 
   const openEdit = (s) => {
-    setForm({ playerId: s.playerId?._id||s.playerId, scholarshipName: s.scholarshipName, scholarshipAmount: s.scholarshipAmount||'', dateAwarded: s.dateAwarded?.slice(0,10)||'' });
+    setForm({ playerId: s.playerId, scholarshipName: s.scholarshipName, scholarshipAmount: s.scholarshipAmount||'', dateAwarded: s.dateAwarded?.slice(0,10)||'' });
     setEditId(s._id); setShowForm(true);
   };
 
@@ -50,8 +50,8 @@ export default function Scholarships() {
         <tbody>
           {scholarships.map(sc => (
             <tr key={sc._id} style={s.tr}>
-              <td style={s.td}>{sc.playerId ? `${sc.playerId.firstName} ${sc.playerId.lastName}` : '—'}</td>
-              <td style={s.td}>{sc.playerId?.schoolId?.schoolName || '—'}</td>
+              <td style={s.td}>{sc.firstName ? `${sc.firstName} ${sc.lastName}` : '—'}</td>
+              <td style={s.td}>{sc.schoolName || '—'}</td>
               <td style={s.td}>{sc.scholarshipName}</td>
               <td style={s.td}>{sc.scholarshipAmount ? `$${sc.scholarshipAmount.toLocaleString()}` : '—'}</td>
               <td style={s.td}>{new Date(sc.dateAwarded).toLocaleDateString()}</td>
@@ -68,7 +68,7 @@ export default function Scholarships() {
               <label style={s.label}>Player *</label>
               <select value={form.playerId} onChange={e => setForm({...form,playerId:e.target.value})} style={s.input} required>
                 <option value="">-- Select Player --</option>
-                {players.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.lastName} ({p.schoolId?.schoolName})</option>)}
+                {players.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.lastName} ({p.schoolName})</option>)}
               </select>
             </div>
             <div>

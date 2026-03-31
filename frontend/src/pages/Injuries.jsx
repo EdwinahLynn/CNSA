@@ -38,7 +38,7 @@ export default function Injuries() {
   };
 
   const openEdit = (i) => {
-    setForm({ playerId: i.playerId?._id||i.playerId, gameId: i.gameId?._id||i.gameId, injuryStatus: i.injuryStatus, injuryCause: i.injuryCause||'', injuryLocation: i.injuryLocation||'', surfaceType: i.surfaceType||'Outdoor', notes: i.notes||'' });
+    setForm({ playerId: i.playerId, gameId: i.gameId, injuryStatus: i.injuryStatus, injuryCause: i.injuryCause||'', injuryLocation: i.injuryLocation||'', surfaceType: i.surfaceType||'Outdoor', notes: i.notes||'' });
     setEditId(i._id); setShowForm(true);
   };
 
@@ -56,8 +56,8 @@ export default function Injuries() {
         <tbody>
           {injuries.map(i => (
             <tr key={i._id} style={s.tr}>
-              <td style={s.td}>{i.playerId ? `${i.playerId.firstName} ${i.playerId.lastName}` : '—'}</td>
-              <td style={s.td}>{i.gameId ? new Date(i.gameId.gameDate).toLocaleDateString() : '—'}</td>
+              <td style={s.td}>{i.firstName ? `${i.firstName} ${i.lastName}` : '—'}</td>
+              <td style={s.td}>{i.gameDate ? new Date(i.gameDate).toLocaleDateString() : '—'}</td>
               <td style={s.td}><span style={{ color: statusColor[i.injuryStatus] }}>{i.injuryStatus}</span></td>
               <td style={s.td}>{i.injuryLocation || '—'}</td>
               <td style={s.td}>{i.injuryCause || '—'}</td>
@@ -82,7 +82,7 @@ export default function Injuries() {
               <label style={s.label}>Game *</label>
               <select value={form.gameId} onChange={e => setForm({...form,gameId:e.target.value})} style={s.input} required>
                 <option value="">-- Select --</option>
-                {games.map(g => <option key={g._id} value={g._id}>{new Date(g.gameDate).toLocaleDateString()} — {g.homeTeamId?.schoolId?.schoolName} vs {g.awayTeamId?.schoolId?.schoolName}</option>)}
+                {games.map(g => <option key={g._id} value={g._id}>{new Date(g.gameDate).toLocaleDateString()} — {g.homeSchool} vs {g.awaySchool}</option>)}
               </select>
             </div>
             <div>

@@ -6,12 +6,14 @@ import { s } from '../styles/shared.js';
 export default function Users() {
   const [users, setUsers]     = useState([]);
   const [schools, setSchools] = useState([]);
+  const [coaches, setCoaches] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '' });
+  const [form, setForm]       = useState({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '', coachId: '' });
 
   useEffect(() => {
     api.get('/auth/users').then(r => setUsers(r.data));
     api.get('/schools').then(r => setSchools(r.data));
+    api.get('/coaches').then(r => setCoaches(r.data));
   }, []);
 
   const handleCreate = async (e) => {
@@ -21,7 +23,7 @@ export default function Users() {
       setUsers(prev => [...prev, data]);
       toast.success('User created');
       setShowForm(false);
-      setForm({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '' });
+      setForm({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '', coachId: '' });
     } catch (err) { toast.error(err.response?.data?.message || 'Error'); }
   };
 
@@ -50,7 +52,7 @@ export default function Users() {
             <tr key={u._id} style={s.tr}>
               <td style={s.td}>{u.username}</td>
               <td style={s.td}><span style={{ background: roleColor[u.role], color:'#fff', padding:'2px 8px', borderRadius:'4px', fontSize:'0.75rem' }}>{u.role}</span></td>
-              <td style={s.td}>{u.schoolId?.schoolName || '—'}</td>
+              <td style={s.td}>{u.schoolName || '—'}</td>
               <td style={s.td}><span style={{ color: u.isActive ? '#27ae60' : '#7f8c8d' }}>{u.isActive ? 'Active' : 'Inactive'}</span></td>
               <td style={s.td}>
                 {u.isActive && <button onClick={() => handleDeactivate(u._id)} style={{ ...s.smBtn, background:'#7f8c8d' }}>Deactivate</button>}
@@ -87,10 +89,31 @@ export default function Users() {
               {form.role !== 'CNSA_ADMIN' && (
                 <div>
                   <label style={s.label}>School *</label>
-                  <select value={form.schoolId} onChange={e => setForm({...form,schoolId:e.target.value})} style={s.input} required>
-                    <option value="">-- Select School --</option>
-                    {schools.map(sc => <option key={sc._id} value={sc._id}>{sc.schoolName}</option>)}
-                  </select>
+                  {schools.length === 0
+                    ? <p style={{ color: '#e67e22', fontSize: '0.85rem', margin: '0.25rem 0' }}>
+                        No schools exist yet. Add a school first before creating this user.
+                      </p>
+                    : <select value={form.schoolId} onChange={e => setForm({...form,schoolId:e.target.value,coachId:''})} style={s.input} required>
+                        <option value="">-- Select School --</option>
+                        {schools.map(sc => <option key={sc._id} value={sc._id}>{sc.schoolName}</option>)}
+                      </select>
+                  }
+                </div>
+              )}
+              {form.role === 'COACH' && (
+                <div>
+                  <label style={s.label}>Link to Coach Profile *</label>
+                  {coaches.filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId)).length === 0
+                    ? <p style={{ color: '#e67e22', fontSize: '0.85rem', margin: '0.25rem 0' }}>
+                        No coaches exist for this school yet. Add a coach profile first.
+                      </p>
+                    : <select value={form.coachId} onChange={e => setForm({...form,coachId:e.target.value})} style={s.input} required>
+                        <option value="">-- Select Coach --</option>
+                        {coaches
+                          .filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId))
+                          .map(c => <option key={c._id} value={c._id}>{c.firstName} {c.lastName}</option>)}
+                      </select>
+                  }
                 </div>
               )}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:'0.5rem' }}>

@@ -23,7 +23,7 @@ export default function Coaches() {
   const canWrite = ['CNSA_ADMIN', 'SCHOOL_ADMIN'].includes(user?.role);
 
   const openEdit = (c) => {
-    setForm({ firstName: c.firstName, lastName: c.lastName, sex: c.sex, phoneNumber: c.phoneNumber||'', email: c.email||'', streetAddress: c.streetAddress, postalCode: c.postalCode, cityName: c.cityName, provinceName: c.provinceName, schoolId: c.schoolId?._id||c.schoolId, previousSchools: c.previousSchools||[] });
+    setForm({ firstName: c.firstName, lastName: c.lastName, sex: c.sex, phoneNumber: c.phoneNumber||'', email: c.email||'', streetAddress: c.streetAddress, postalCode: c.postalCode, cityName: c.cityName, provinceName: c.provinceName, schoolId: c.schoolId, previousSchools: c.previousSchools||[] });
     setEditId(c._id); setShowForm(true);
   };
 
@@ -56,7 +56,7 @@ export default function Coaches() {
           {coaches.map(c => (
             <tr key={c._id} style={s.tr}>
               <td style={s.td}>{c.firstName} {c.lastName}</td>
-              <td style={s.td}>{c.schoolId?.schoolName || '—'}</td>
+              <td style={s.td}>{c.schoolName || '—'}</td>
               <td style={s.td}>{c.email || '—'}</td>
               <td style={s.td}>{c.phoneNumber || '—'}</td>
               <td style={s.td}>{canWrite && <button onClick={() => openEdit(c)} style={s.smBtn}>Edit</button>}</td>

@@ -28,7 +28,7 @@ export default function PlayerDetail() {
       <div style={s.header}>
         <div>
           <h2 style={localStyles.name}>{player.firstName} {player.lastName}</h2>
-          <p style={localStyles.meta}>{player.schoolId?.schoolName} · {player.sex === 'M' ? 'Male' : player.sex === 'F' ? 'Female' : 'Other'}</p>
+          <p style={localStyles.meta}>{player.schoolName} · {player.sex === 'M' ? 'Male' : player.sex === 'F' ? 'Female' : 'Other'}</p>
         </div>
         <StatusBadge status={player.status} />
       </div>
@@ -40,8 +40,8 @@ export default function PlayerDetail() {
           <Row label="Address"       value={`${player.streetAddress}, ${player.cityName}, ${player.provinceName} ${player.postalCode}`} />
           <Row label="High School"   value={player.highSchool} />
           <Row label="Recruit Rank"  value={player.recruitingRank} />
-          <Row label="Recruit Source" value={player.recruitSourceId?.sourceName} />
-          <Row label="Positions"     value={player.positions?.map(p => p.positionName).join(', ')} />
+          <Row label="Recruit Source" value={player.sourceName} />
+          <Row label="Positions"     value={player.positions} />
         </Section>
 
         <Section title={`Scholarships (${scholarships.length})`}>

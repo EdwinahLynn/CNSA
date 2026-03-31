@@ -5,7 +5,9 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "initdb": "node src/config/initDb.js",
+    "migrate": "node src/config/migrate.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -14,7 +16,7 @@
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.4"
+    "mssql": "^11.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
