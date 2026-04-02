@@ -51,6 +51,27 @@ CREATE TABLE RecruitingSource (
 GO
 
 -- =============================================
+-- HIGH SCHOOL
+-- =============================================
+IF OBJECT_ID('dbo.HighSchool', 'U') IS NULL
+CREATE TABLE HighSchool (
+    HighSchoolID   INT          NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    HighSchoolName VARCHAR(100) NOT NULL,
+    PostalCode     VARCHAR(10)  NOT NULL REFERENCES Address(PostalCode)
+);
+GO
+
+-- =============================================
+-- PROVINCIAL ORGANIZATION
+-- =============================================
+IF OBJECT_ID('dbo.ProvincialOrganization', 'U') IS NULL
+CREATE TABLE ProvincialOrganization (
+    OrganizationID   INT          NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    OrganizationName VARCHAR(100) NOT NULL
+);
+GO
+
+-- =============================================
 -- COACH
 -- =============================================
 IF OBJECT_ID('dbo.Coach', 'U') IS NULL
@@ -96,9 +117,32 @@ CREATE TABLE Player (
     Status               VARCHAR(20)  NOT NULL DEFAULT 'Active'
         CHECK (Status IN ('Active','Graduated','Inactive')),
     RecruitingRank       INT,
-    HighSchool           VARCHAR(100),
-    RecruitSourceID      INT          REFERENCES RecruitingSource(RecruitSourceID),
-    RecruitingIncidents  TEXT
+    HighSchoolID         INT          REFERENCES HighSchool(HighSchoolID),
+    RecruitSourceID      INT          REFERENCES RecruitingSource(RecruitSourceID)
+);
+GO
+
+-- =============================================
+-- RECRUITING INCIDENT
+-- =============================================
+IF OBJECT_ID('dbo.RecruitingIncident', 'U') IS NULL
+CREATE TABLE RecruitingIncident (
+    IncidentID   INT          NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    PlayerID     INT          NOT NULL REFERENCES Player(PlayerID),
+    Description  VARCHAR(255) NOT NULL,
+    IncidentDate DATE         NOT NULL
+);
+GO
+
+-- =============================================
+-- RECRUITING RANKING
+-- =============================================
+IF OBJECT_ID('dbo.RecruitingRanking', 'U') IS NULL
+CREATE TABLE RecruitingRanking (
+    RankingID    INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    PlayerID     INT NOT NULL REFERENCES Player(PlayerID),
+    RankingValue INT NOT NULL CHECK (RankingValue >= 0),
+    RankingYear  INT NOT NULL
 );
 GO
 
@@ -122,7 +166,8 @@ CREATE TABLE Stadium (
     StadiumName     VARCHAR(100) NOT NULL,
     StreetAddress   VARCHAR(100) NOT NULL,
     PostalCode      VARCHAR(10)  NOT NULL REFERENCES Address(PostalCode),
-    StadiumCapacity INT          NOT NULL
+    StadiumCapacity  INT          NOT NULL,
+    OrganizationID   INT          NULL REFERENCES ProvincialOrganization(OrganizationID)
 );
 GO
 

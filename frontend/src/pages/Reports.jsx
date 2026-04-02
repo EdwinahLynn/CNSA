@@ -10,9 +10,10 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
 
   const tabs = [
+    { key: 'my-players',        label: 'My Players',          roles: ['COACH'] },
     { key: 'top-scorers',       label: 'Top Scorers',         roles: ['CNSA_ADMIN','SCHOOL_ADMIN','COACH'] },
+    { key: 'injuries-summary',  label: 'Injuries Summary',    roles: ['CNSA_ADMIN','SCHOOL_ADMIN','COACH'] },
     { key: 'players-by-school', label: 'Players by School',   roles: ['CNSA_ADMIN'] },
-    { key: 'injuries-summary',  label: 'Injuries Summary',    roles: ['CNSA_ADMIN','SCHOOL_ADMIN'] },
     { key: 'audit',             label: 'Audit Log',           roles: ['CNSA_ADMIN'] },
   ].filter(t => t.roles.includes(user?.role));
 
@@ -36,6 +37,7 @@ export default function Reports() {
 
       {loading ? <p style={{ color:'#888' }}>Loading...</p> : (
         <div style={s.card}>
+          {tab === 'my-players' && <MyPlayers data={data} />}
           {tab === 'top-scorers' && <TopScorers data={data} />}
           {tab === 'players-by-school' && <PlayersBySchool data={data} />}
           {tab === 'injuries-summary' && <InjuriesSummary data={data} />}
@@ -43,6 +45,27 @@ export default function Reports() {
         </div>
       )}
     </div>
+  );
+}
+
+function MyPlayers({ data }) {
+  return (
+    <table style={s.table}>
+      <thead><tr>{['Player','School','Status','Positions','Injuries','Incidents'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+      <tbody>
+        {data.length === 0 && <tr><td colSpan={6} style={{ ...s.td, color:'#555', fontStyle:'italic' }}>No players assigned to you yet.</td></tr>}
+        {data.map(p => (
+          <tr key={p._id} style={s.tr}>
+            <td style={s.td}>{p.firstName} {p.lastName}</td>
+            <td style={s.td}>{p.schoolName}</td>
+            <td style={s.td}><span style={{ color: p.status === 'Active' ? '#27ae60' : '#7f8c8d' }}>{p.status}</span></td>
+            <td style={s.td}>{p.positions || '—'}</td>
+            <td style={s.td}>{p.injuryCount}</td>
+            <td style={s.td}>{p.incidentCount}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

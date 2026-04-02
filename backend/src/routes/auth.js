@@ -117,6 +117,56 @@ router.post('/register', protect, authorize('CNSA_ADMIN'), [
   res.status(201).json(result.recordset[0]);
 });
 
+// PUT /api/auth/users/:id (CNSA_ADMIN only)
+router.put('/users/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
+  const { username, password, role, schoolId, coachId } = req.body;
+  if (!username || !role) return res.status(400).json({ message: 'Username and role are required' });
+
+  const pool = await getPool();
+
+  // Check username not taken by another user
+  const existing = await pool.request()
+    .input('username', sql.VarChar(50), username)
+    .input('id',       sql.Int,         req.params.id)
+    .query('SELECT UserID FROM Users WHERE Username = @username AND UserID <> @id');
+  if (existing.recordset.length > 0) return res.status(409).json({ message: 'Username already taken' });
+
+  if (coachId) {
+    const coachCheck = await pool.request()
+      .input('coachId',  sql.Int, coachId)
+      .input('schoolId', sql.Int, schoolId || null)
+      .query('SELECT CoachID FROM Coach WHERE CoachID=@coachId AND SchoolID=@schoolId');
+    if (!coachCheck.recordset[0]) return res.status(400).json({ message: 'Coach does not belong to the selected school' });
+  }
+
+  // Build update — only rehash password if a new one was provided
+  if (password && password.length >= 6) {
+    const hash = await bcrypt.hash(password, 12);
+    await pool.request()
+      .input('id',       sql.Int,          req.params.id)
+      .input('username', sql.VarChar(50),  username)
+      .input('hash',     sql.VarChar(255), hash)
+      .input('role',     sql.VarChar(20),  role)
+      .input('schoolId', sql.Int,          schoolId || null)
+      .input('coachId',  sql.Int,          coachId  || null)
+      .query('UPDATE Users SET Username=@username, PasswordHash=@hash, Role=@role, SchoolID=@schoolId, CoachID=@coachId WHERE UserID=@id');
+  } else {
+    await pool.request()
+      .input('id',       sql.Int,         req.params.id)
+      .input('username', sql.VarChar(50), username)
+      .input('role',     sql.VarChar(20), role)
+      .input('schoolId', sql.Int,         schoolId || null)
+      .input('coachId',  sql.Int,         coachId  || null)
+      .query('UPDATE Users SET Username=@username, Role=@role, SchoolID=@schoolId, CoachID=@coachId WHERE UserID=@id');
+  }
+
+  const updated = await pool.request()
+    .input('id', sql.Int, req.params.id)
+    .query(`SELECT u.UserID AS _id, u.UserID, u.Username, u.Role, u.IsActive, u.SchoolID, u.CoachID, s.SchoolName
+            FROM Users u LEFT JOIN School s ON u.SchoolID = s.SchoolID WHERE u.UserID = @id`);
+  res.json(updated.recordset[0]);
+});
+
 // PATCH /api/auth/users/:id/deactivate (CNSA_ADMIN only)
 router.patch('/users/:id/deactivate', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
@@ -126,11 +176,20 @@ router.patch('/users/:id/deactivate', protect, authorize('CNSA_ADMIN'), async (r
   res.json({ message: 'User deactivated' });
 });
 
+// PATCH /api/auth/users/:id/activate (CNSA_ADMIN only)
+router.patch('/users/:id/activate', protect, authorize('CNSA_ADMIN'), async (req, res) => {
+  const pool = await getPool();
+  await pool.request()
+    .input('id', sql.Int, req.params.id)
+    .query('UPDATE Users SET IsActive = 1 WHERE UserID = @id');
+  res.json({ message: 'User activated' });
+});
+
 // GET /api/auth/users (CNSA_ADMIN only)
 router.get('/users', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
   const result = await pool.request().query(`
-    SELECT u.UserID, u.Username, u.Role, u.IsActive, u.SchoolID, s.SchoolName
+    SELECT u.UserID AS _id, u.UserID, u.Username, u.Role, u.IsActive, u.SchoolID, u.CoachID, s.SchoolName
     FROM Users u
     LEFT JOIN School s ON u.SchoolID = s.SchoolID
   `);

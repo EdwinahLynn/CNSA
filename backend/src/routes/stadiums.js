@@ -5,9 +5,11 @@ const { authorize } = require('../middleware/roles');
 
 const stadiumSelect = `
   SELECT st.StadiumID AS _id, st.StadiumID, st.StadiumName, st.StreetAddress, st.PostalCode,
-         st.StadiumCapacity, a.CityName, a.ProvinceName
+         st.StadiumCapacity, a.CityName, a.ProvinceName,
+         st.OrganizationID, po.OrganizationName
   FROM Stadium st
   JOIN Address a ON st.PostalCode = a.PostalCode
+  LEFT JOIN ProvincialOrganization po ON st.OrganizationID = po.OrganizationID
 `;
 
 router.get('/', protect, async (req, res) => {
@@ -23,7 +25,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
-  const { stadiumName, streetAddress, postalCode, cityName, provinceName, stadiumCapacity } = req.body;
+  const { stadiumName, streetAddress, postalCode, cityName, provinceName, stadiumCapacity, organizationId } = req.body;
   const pool = await getPool();
 
   await pool.request()
@@ -38,9 +40,10 @@ router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
     .input('streetAddress',   sql.VarChar(100), streetAddress)
     .input('postalCode',      sql.VarChar(10),  postalCode.toUpperCase())
     .input('stadiumCapacity', sql.Int,          stadiumCapacity)
-    .query(`INSERT INTO Stadium (StadiumName, StreetAddress, PostalCode, StadiumCapacity)
+    .input('organizationId',  sql.Int,          organizationId || null)
+    .query(`INSERT INTO Stadium (StadiumName, StreetAddress, PostalCode, StadiumCapacity, OrganizationID)
             OUTPUT INSERTED.StadiumID
-            VALUES (@stadiumName, @streetAddress, @postalCode, @stadiumCapacity)`);
+            VALUES (@stadiumName, @streetAddress, @postalCode, @stadiumCapacity, @organizationId)`);
 
   const newId = result.recordset[0].StadiumID;
   const full  = await pool.request().input('id', sql.Int, newId).query(stadiumSelect + ' WHERE st.StadiumID = @id');
@@ -48,7 +51,7 @@ router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
-  const { stadiumName, streetAddress, postalCode, cityName, provinceName, stadiumCapacity } = req.body;
+  const { stadiumName, streetAddress, postalCode, cityName, provinceName, stadiumCapacity, organizationId } = req.body;
   const pool = await getPool();
 
   await pool.request()
@@ -63,9 +66,11 @@ router.put('/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
     .input('stadiumName',     sql.VarChar(100), stadiumName)
     .input('streetAddress',   sql.VarChar(100), streetAddress)
     .input('postalCode',      sql.VarChar(10),  postalCode.toUpperCase())
-    .input('stadiumCapacity', sql.Int,          stadiumCapacity)
+    .input('stadiumCapacity', sql.Int, stadiumCapacity)
+    .input('organizationId',  sql.Int, organizationId || null)
     .query(`UPDATE Stadium SET StadiumName=@stadiumName, StreetAddress=@streetAddress,
-            PostalCode=@postalCode, StadiumCapacity=@stadiumCapacity WHERE StadiumID=@id`);
+            PostalCode=@postalCode, StadiumCapacity=@stadiumCapacity,
+            OrganizationID=@organizationId WHERE StadiumID=@id`);
 
   const full = await pool.request().input('id', sql.Int, req.params.id).query(stadiumSelect + ' WHERE st.StadiumID = @id');
   res.json(full.recordset[0]);

@@ -17,7 +17,10 @@ router.get('/', protect, async (req, res) => {
   const pool = await getPool();
   const request = pool.request();
   let query = injurySelect;
-  if (req.user.Role !== 'CNSA_ADMIN') {
+  if (req.user.Role === 'COACH') {
+    query += ' WHERE p.CoachID = @coachId';
+    request.input('coachId', sql.Int, req.user.CoachID);
+  } else if (req.user.Role !== 'CNSA_ADMIN') {
     query += ' WHERE p.SchoolID = @schoolId';
     request.input('schoolId', sql.Int, req.user.SchoolID);
   }
@@ -36,7 +39,13 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), auditAction('CREATE', 'Injury'), async (req, res) => {
   const { playerId, gameId, injuryStatus, injuryCause, injuryLocation, surfaceType, notes } = req.body;
 
-  if (req.user.Role !== 'CNSA_ADMIN') {
+  if (req.user.Role === 'COACH') {
+    const pool = await getPool();
+    const check = await pool.request().input('id', sql.Int, playerId).query('SELECT CoachID FROM Player WHERE PlayerID = @id');
+    if (!check.recordset[0] || check.recordset[0].CoachID !== req.user.CoachID) {
+      return res.status(403).json({ message: 'Access denied — not your player' });
+    }
+  } else if (req.user.Role !== 'CNSA_ADMIN') {
     const pool = await getPool();
     const check = await pool.request().input('id', sql.Int, playerId).query('SELECT SchoolID FROM Player WHERE PlayerID = @id');
     if (!check.recordset[0] || check.recordset[0].SchoolID !== req.user.SchoolID) {

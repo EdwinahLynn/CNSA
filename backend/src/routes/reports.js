@@ -31,7 +31,7 @@ router.get('/players-by-school', protect, authorize('CNSA_ADMIN'), async (req, r
 });
 
 // GET /api/reports/injuries-summary
-router.get('/injuries-summary', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), async (req, res) => {
+router.get('/injuries-summary', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), async (req, res) => {
   const pool = await getPool();
   const request = pool.request();
   let query = `
@@ -39,12 +39,36 @@ router.get('/injuries-summary', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN')
     FROM Injury i
     JOIN Player p ON i.PlayerID = p.PlayerID
   `;
-  if (req.user.Role !== 'CNSA_ADMIN') {
+  if (req.user.Role === 'COACH') {
+    query += ' WHERE p.CoachID = @coachId';
+    request.input('coachId', sql.Int, req.user.CoachID);
+  } else if (req.user.Role !== 'CNSA_ADMIN') {
     query += ' WHERE p.SchoolID = @schoolId';
     request.input('schoolId', sql.Int, req.user.SchoolID);
   }
   query += ' GROUP BY i.InjuryStatus';
   res.json((await request.query(query)).recordset);
+});
+
+// GET /api/reports/my-players (COACH only)
+router.get('/my-players', protect, authorize('COACH'), async (req, res) => {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('coachId', sql.Int, req.user.CoachID)
+    .query(`
+      SELECT p.PlayerID AS _id, p.FirstName, p.LastName, p.Status, p.HighSchool,
+             s.SchoolName,
+             (SELECT STRING_AGG(pos.PositionName, ', ')
+              FROM PlayerPosition pp JOIN Position pos ON pp.PositionID = pos.PositionID
+              WHERE pp.PlayerID = p.PlayerID) AS Positions,
+             (SELECT COUNT(*) FROM Injury i WHERE i.PlayerID = p.PlayerID) AS InjuryCount,
+             (SELECT COUNT(*) FROM RecruitingIncident ri WHERE ri.PlayerID = p.PlayerID) AS IncidentCount
+      FROM Player p
+      JOIN School s ON p.SchoolID = s.SchoolID
+      WHERE p.CoachID = @coachId
+      ORDER BY p.LastName, p.FirstName
+    `);
+  res.json(result.recordset);
 });
 
 // GET /api/reports/top-scorers

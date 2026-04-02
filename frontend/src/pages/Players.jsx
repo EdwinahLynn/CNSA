@@ -8,7 +8,7 @@ import { s } from '../styles/shared.js';
 const EMPTY = { firstName: '', lastName: '', sex: 'M', phoneNumber: '', email: '',
   streetAddress: '', postalCode: '', cityName: '', provinceName: '',
   schoolId: '', status: 'Active', recruitingRank: '', highSchool: '',
-  recruitingIncidents: '', positionIds: [], coachId: '' };
+  positionIds: [], coachId: '' };
 
 export default function Players() {
   const { user } = useAuth();
@@ -48,7 +48,7 @@ export default function Players() {
       cityName: p.cityName, provinceName: p.provinceName,
       schoolId: p.schoolId, coachId: p.coachId || '',
       status: p.status, recruitingRank: p.recruitingRank || '',
-      highSchool: p.highSchool || '', recruitingIncidents: p.recruitingIncidents || '',
+      highSchool: p.highSchool || '',
       positionIds: p.positionIds || []
     });
     setEditId(p._id);
@@ -135,7 +135,7 @@ export default function Players() {
             <Field label="City"          value={form.cityName}     onChange={v => setForm({...form, cityName: v})}     required />
             <Field label="Province"      value={form.provinceName} onChange={v => setForm({...form, provinceName: v})} required />
             <Field label="Postal Code"   value={form.postalCode}   onChange={v => setForm({...form, postalCode: v})}   required />
-            <Field label="High School"   value={form.highSchool}   onChange={v => setForm({...form, highSchool: v})} />
+            <Field label="High School" value={form.highSchool} onChange={v => setForm({...form, highSchool: v})} />
             <Field label="Recruiting Rank" type="number" value={form.recruitingRank} onChange={v => setForm({...form, recruitingRank: v})} />
             <Field label="School" type="select" value={form.schoolId} onChange={v => setForm({...form, schoolId: v, coachId: ''})}
               options={schools.map(s => ({ value: s._id, label: s.schoolName }))} required

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +9,7 @@ const EMPTY = { playerId: '', gameId: '', injuryStatus: 'New', injuryCause: '', 
 
 export default function Injuries() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [injuries, setInjuries] = useState([]);
   const [players, setPlayers]   = useState([]);
   const [games, setGames]       = useState([]);
@@ -62,7 +64,12 @@ export default function Injuries() {
               <td style={s.td}>{i.injuryLocation || '—'}</td>
               <td style={s.td}>{i.injuryCause || '—'}</td>
               <td style={s.td}>{i.surfaceType || '—'}</td>
-              <td style={s.td}><button onClick={() => openEdit(i)} style={s.smBtn}>Edit</button></td>
+              <td style={s.td}>
+                <div style={{ display:'flex', gap:'0.4rem' }}>
+                  <button onClick={() => openEdit(i)} style={s.smBtn}>Edit</button>
+                  <button onClick={() => window.open(`/injuries/${i._id}/report`, '_blank')} style={{ ...s.smBtn, background:'#2980b9' }}>📄 Report</button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

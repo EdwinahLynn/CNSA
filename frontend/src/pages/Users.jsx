@@ -3,12 +3,15 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { s } from '../styles/shared.js';
 
+const EMPTY = { username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '', coachId: '' };
+
 export default function Users() {
   const [users, setUsers]     = useState([]);
   const [schools, setSchools] = useState([]);
   const [coaches, setCoaches] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]       = useState({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '', coachId: '' });
+  const [editId, setEditId]   = useState(null);
+  const [form, setForm]       = useState(EMPTY);
 
   useEffect(() => {
     api.get('/auth/users').then(r => setUsers(r.data));
@@ -16,14 +19,31 @@ export default function Users() {
     api.get('/coaches').then(r => setCoaches(r.data));
   }, []);
 
-  const handleCreate = async (e) => {
+  const openAdd = () => {
+    setForm(EMPTY);
+    setEditId(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (u) => {
+    setForm({ username: u.username, password: '', role: u.role, schoolId: u.schoolId || '', coachId: u.coachId || '' });
+    setEditId(u._id);
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await api.post('/auth/register', form);
-      setUsers(prev => [...prev, data]);
-      toast.success('User created');
+      if (editId) {
+        const { data } = await api.put(`/auth/users/${editId}`, form);
+        setUsers(prev => prev.map(u => u._id === editId ? { ...u, ...data } : u));
+        toast.success('User updated');
+      } else {
+        const { data } = await api.post('/auth/register', form);
+        setUsers(prev => [...prev, data]);
+        toast.success('User created');
+      }
       setShowForm(false);
-      setForm({ username: '', password: '', role: 'SCHOOL_ADMIN', schoolId: '', coachId: '' });
     } catch (err) { toast.error(err.response?.data?.message || 'Error'); }
   };
 
@@ -33,7 +53,15 @@ export default function Users() {
       await api.patch(`/auth/users/${id}/deactivate`);
       setUsers(prev => prev.map(u => u._id === id ? { ...u, isActive: false } : u));
       toast.success('User deactivated');
-    } catch { toast.error('Failed to deactivate'); }
+    } catch { toast.error('Failed'); }
+  };
+
+  const handleActivate = async (id) => {
+    try {
+      await api.patch(`/auth/users/${id}/activate`);
+      setUsers(prev => prev.map(u => u._id === id ? { ...u, isActive: true } : u));
+      toast.success('User activated');
+    } catch { toast.error('Failed'); }
   };
 
   const roleColor = { CNSA_ADMIN: '#e94560', SCHOOL_ADMIN: '#2980b9', COACH: '#27ae60' };
@@ -42,7 +70,7 @@ export default function Users() {
     <div style={s.page}>
       <div style={s.header}>
         <h2 style={s.title}>User Management</h2>
-        <button onClick={() => setShowForm(true)} style={s.btn}>+ Create User</button>
+        <button onClick={openAdd} style={s.btn}>+ Create User</button>
       </div>
 
       <table style={s.table}>
@@ -55,7 +83,13 @@ export default function Users() {
               <td style={s.td}>{u.schoolName || '—'}</td>
               <td style={s.td}><span style={{ color: u.isActive ? '#27ae60' : '#7f8c8d' }}>{u.isActive ? 'Active' : 'Inactive'}</span></td>
               <td style={s.td}>
-                {u.isActive && <button onClick={() => handleDeactivate(u._id)} style={{ ...s.smBtn, background:'#7f8c8d' }}>Deactivate</button>}
+                <div style={{ display:'flex', gap:'0.4rem' }}>
+                  <button onClick={() => openEdit(u)} style={s.smBtn}>Edit</button>
+                  {u.isActive
+                    ? <button onClick={() => handleDeactivate(u._id)} style={{ ...s.smBtn, background:'#7f8c8d' }}>Deactivate</button>
+                    : <button onClick={() => handleActivate(u._id)} style={{ ...s.smBtn, background:'#27ae60' }}>Activate</button>
+                  }
+                </div>
               </td>
             </tr>
           ))}
@@ -66,21 +100,21 @@ export default function Users() {
         <div style={s.overlay}>
           <div style={s.modal}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1.5rem' }}>
-              <h3 style={{ margin:0, color:'#e94560' }}>Create User</h3>
+              <h3 style={{ margin:0, color:'#e94560' }}>{editId ? 'Edit User' : 'Create User'}</h3>
               <button onClick={() => setShowForm(false)} style={{ background:'none', border:'none', color:'#888', fontSize:'1.25rem', cursor:'pointer' }}>✕</button>
             </div>
-            <form onSubmit={handleCreate} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+            <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
               <div>
                 <label style={s.label}>Username *</label>
-                <input value={form.username} onChange={e => setForm({...form,username:e.target.value})} style={s.input} required />
+                <input value={form.username} onChange={e => setForm({...form, username: e.target.value})} style={s.input} required />
               </div>
               <div>
-                <label style={s.label}>Password * (min 6 chars)</label>
-                <input type="password" value={form.password} onChange={e => setForm({...form,password:e.target.value})} style={s.input} minLength={6} required />
+                <label style={s.label}>{editId ? 'New Password (leave blank to keep current)' : 'Password * (min 6 chars)'}</label>
+                <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} style={s.input} minLength={editId ? 0 : 6} required={!editId} placeholder={editId ? 'Leave blank to keep current' : ''} />
               </div>
               <div>
                 <label style={s.label}>Role *</label>
-                <select value={form.role} onChange={e => setForm({...form,role:e.target.value})} style={s.input}>
+                <select value={form.role} onChange={e => setForm({...form, role: e.target.value, schoolId: '', coachId: ''})} style={s.input}>
                   <option value="CNSA_ADMIN">CNSA Admin</option>
                   <option value="SCHOOL_ADMIN">School Admin</option>
                   <option value="COACH">Coach</option>
@@ -90,10 +124,8 @@ export default function Users() {
                 <div>
                   <label style={s.label}>School *</label>
                   {schools.length === 0
-                    ? <p style={{ color: '#e67e22', fontSize: '0.85rem', margin: '0.25rem 0' }}>
-                        No schools exist yet. Add a school first before creating this user.
-                      </p>
-                    : <select value={form.schoolId} onChange={e => setForm({...form,schoolId:e.target.value,coachId:''})} style={s.input} required>
+                    ? <p style={{ color:'#e67e22', fontSize:'0.85rem', margin:'0.25rem 0' }}>No schools exist yet. Add a school first.</p>
+                    : <select value={form.schoolId} onChange={e => setForm({...form, schoolId: e.target.value, coachId: ''})} style={s.input} required>
                         <option value="">-- Select School --</option>
                         {schools.map(sc => <option key={sc._id} value={sc._id}>{sc.schoolName}</option>)}
                       </select>
@@ -104,10 +136,8 @@ export default function Users() {
                 <div>
                   <label style={s.label}>Link to Coach Profile *</label>
                   {coaches.filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId)).length === 0
-                    ? <p style={{ color: '#e67e22', fontSize: '0.85rem', margin: '0.25rem 0' }}>
-                        No coaches exist for this school yet. Add a coach profile first.
-                      </p>
-                    : <select value={form.coachId} onChange={e => setForm({...form,coachId:e.target.value})} style={s.input} required>
+                    ? <p style={{ color:'#e67e22', fontSize:'0.85rem', margin:'0.25rem 0' }}>No coaches exist for this school yet.</p>
+                    : <select value={form.coachId} onChange={e => setForm({...form, coachId: e.target.value})} style={s.input} required>
                         <option value="">-- Select Coach --</option>
                         {coaches
                           .filter(c => !form.schoolId || Number(c.schoolId) === Number(form.schoolId))
@@ -118,7 +148,7 @@ export default function Users() {
               )}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:'0.5rem' }}>
                 <button type="button" onClick={() => setShowForm(false)} style={s.cancelBtn}>Cancel</button>
-                <button type="submit" style={s.btn}>Create</button>
+                <button type="submit" style={s.btn}>{editId ? 'Save Changes' : 'Create'}</button>
               </div>
             </form>
           </div>

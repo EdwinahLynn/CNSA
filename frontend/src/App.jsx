@@ -16,7 +16,9 @@ import Scholarships from './pages/Scholarships';
 import Schools      from './pages/Schools';
 import Stadiums     from './pages/Stadiums';
 import Reports      from './pages/Reports';
+import InjuryReport from './pages/InjuryReport';
 import Users        from './pages/Users';
+import Settings     from './pages/Settings';
 
 function Layout({ children }) {
   return (
@@ -43,11 +45,13 @@ export default function App() {
           <Route path="/teams"     element={<ProtectedRoute><Layout><Teams /></Layout></ProtectedRoute>} />
           <Route path="/games"     element={<ProtectedRoute><Layout><Games /></Layout></ProtectedRoute>} />
           <Route path="/injuries"  element={<ProtectedRoute><Layout><Injuries /></Layout></ProtectedRoute>} />
+          <Route path="/injuries/:id/report" element={<ProtectedRoute><InjuryReport /></ProtectedRoute>} />
           <Route path="/scholarships" element={<ProtectedRoute><Layout><Scholarships /></Layout></ProtectedRoute>} />
           <Route path="/schools"   element={<ProtectedRoute roles={['CNSA_ADMIN']}><Layout><Schools /></Layout></ProtectedRoute>} />
           <Route path="/stadiums"  element={<ProtectedRoute roles={['CNSA_ADMIN']}><Layout><Stadiums /></Layout></ProtectedRoute>} />
-          <Route path="/reports"   element={<ProtectedRoute roles={['CNSA_ADMIN','SCHOOL_ADMIN']}><Layout><Reports /></Layout></ProtectedRoute>} />
+          <Route path="/reports"   element={<ProtectedRoute roles={['CNSA_ADMIN','SCHOOL_ADMIN','COACH']}><Layout><Reports /></Layout></ProtectedRoute>} />
           <Route path="/users"     element={<ProtectedRoute roles={['CNSA_ADMIN']}><Layout><Users /></Layout></ProtectedRoute>} />
+          <Route path="/settings"  element={<ProtectedRoute roles={['CNSA_ADMIN']}><Layout><Settings /></Layout></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

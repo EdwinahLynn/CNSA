@@ -8,7 +8,7 @@ const playerSelect = `
   SELECT p.PlayerID AS _id, p.PlayerID, p.FirstName, p.LastName, p.Sex, p.PhoneNumber, p.Email,
          p.StreetAddress, p.PostalCode, a.CityName, a.ProvinceName,
          p.SchoolID, s.SchoolName, p.Status, p.RecruitingRank, p.HighSchool,
-         p.RecruitSourceID, rs.SourceName, rs.SourceType, p.RecruitingIncidents,
+         p.RecruitSourceID, rs.SourceName, rs.SourceType,
          p.CoachID, c.FirstName AS CoachFirstName, c.LastName AS CoachLastName,
          (SELECT STRING_AGG(pos.PositionName, ', ')
           FROM PlayerPosition pp
@@ -52,9 +52,8 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), auditAction('CREATE', 'Player'), async (req, res) => {
   const { firstName, lastName, sex, phoneNumber, email, streetAddress, postalCode,
           cityName, provinceName, schoolId, status, recruitingRank, highSchool,
-          recruitSourceId, recruitingIncidents, positionIds } = req.body;
+          recruitSourceId, positionIds } = req.body;
 
-  // Coaches are auto-assigned; admins can pick a coach from the form
   const coachId = req.user.Role === 'COACH' ? req.user.CoachID : (req.body.coachId || null);
 
   if (req.user.Role !== 'CNSA_ADMIN' && Number(schoolId) !== req.user.SchoolID) {
@@ -80,15 +79,14 @@ router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), audi
     .input('schoolId',            sql.Int,          schoolId)
     .input('status',              sql.VarChar(20),  status || 'Active')
     .input('recruitingRank',      sql.Int,          recruitingRank || null)
-    .input('highSchool',          sql.VarChar(100), highSchool || null)
-    .input('recruitSourceId',     sql.Int,          recruitSourceId || null)
-    .input('recruitingIncidents', sql.Text,         recruitingIncidents || null)
-    .input('coachId',             sql.Int,          coachId || null)
+    .input('highSchool',      sql.VarChar(100), highSchool      || null)
+    .input('recruitSourceId', sql.Int,          recruitSourceId || null)
+    .input('coachId',         sql.Int,          coachId         || null)
     .query(`INSERT INTO Player (FirstName, LastName, Sex, PhoneNumber, Email, StreetAddress,
-              PostalCode, SchoolID, Status, RecruitingRank, HighSchool, RecruitSourceID, RecruitingIncidents, CoachID)
+              PostalCode, SchoolID, Status, RecruitingRank, HighSchool, RecruitSourceID, CoachID)
             OUTPUT INSERTED.PlayerID
             VALUES (@firstName, @lastName, @sex, @phoneNumber, @email, @streetAddress,
-              @postalCode, @schoolId, @status, @recruitingRank, @highSchool, @recruitSourceId, @recruitingIncidents, @coachId)`);
+              @postalCode, @schoolId, @status, @recruitingRank, @highSchool, @recruitSourceId, @coachId)`);
 
   const newId = result.recordset[0].PlayerID;
 
@@ -116,7 +114,7 @@ router.put('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), au
 
   const { firstName, lastName, sex, phoneNumber, email, streetAddress, postalCode,
           cityName, provinceName, schoolId, status, recruitingRank, highSchool,
-          recruitSourceId, recruitingIncidents } = req.body;
+          recruitSourceId } = req.body;
 
   const coachId = req.user.Role === 'COACH' ? req.user.CoachID : (req.body.coachId || null);
 
@@ -139,16 +137,14 @@ router.put('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), au
     .input('schoolId',            sql.Int,          schoolId)
     .input('status',              sql.VarChar(20),  status)
     .input('recruitingRank',      sql.Int,          recruitingRank || null)
-    .input('highSchool',          sql.VarChar(100), highSchool || null)
-    .input('recruitSourceId',     sql.Int,          recruitSourceId || null)
-    .input('recruitingIncidents', sql.Text,         recruitingIncidents || null)
-    .input('coachId',             sql.Int,          coachId || null)
+    .input('highSchool',      sql.VarChar(100), highSchool      || null)
+    .input('recruitSourceId', sql.Int,          recruitSourceId || null)
+    .input('coachId',         sql.Int,          coachId         || null)
     .query(`UPDATE Player SET FirstName=@firstName, LastName=@lastName, Sex=@sex,
             PhoneNumber=@phoneNumber, Email=@email, StreetAddress=@streetAddress,
             PostalCode=@postalCode, SchoolID=@schoolId, Status=@status,
             RecruitingRank=@recruitingRank, HighSchool=@highSchool,
-            RecruitSourceID=@recruitSourceId, RecruitingIncidents=@recruitingIncidents,
-            CoachID=@coachId
+            RecruitSourceID=@recruitSourceId, CoachID=@coachId
             WHERE PlayerID=@id`);
 
   const { positionIds } = req.body;

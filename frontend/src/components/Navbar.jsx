@@ -5,14 +5,15 @@ const navLinks = [
   { to: '/dashboard',    label: 'Dashboard',    roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
   { to: '/players',      label: 'Players',      roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
   { to: '/coaches',      label: 'Coaches',      roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN'] },
-  { to: '/teams',        label: 'Teams',        roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
-  { to: '/games',        label: 'Games',        roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
+  { to: '/teams',        label: 'Teams',        roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN'] },
+  { to: '/games',        label: 'Games',        roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN'] },
   { to: '/injuries',     label: 'Injuries',     roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
   { to: '/scholarships', label: 'Scholarships', roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN'] },
   { to: '/schools',      label: 'Schools',      roles: ['CNSA_ADMIN'] },
   { to: '/stadiums',     label: 'Stadiums',     roles: ['CNSA_ADMIN'] },
-  { to: '/reports',      label: 'Reports',      roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN'] },
+  { to: '/reports',      label: 'Summaries',    roles: ['CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'] },
   { to: '/users',        label: 'Users',        roles: ['CNSA_ADMIN'] },
+  { to: '/settings',    label: 'Settings',     roles: ['CNSA_ADMIN'] },
 ];
 
 export default function Navbar() {
