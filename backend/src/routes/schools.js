@@ -1,79 +1,49 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }    = require('../middleware/auth');
 const { authorize }  = require('../middleware/roles');
 const { auditAction } = require('../middleware/audit');
 
+const schoolSelect = `
+  SELECT schoolid AS "_id", schoolid AS "SchoolID", schoolname AS "SchoolName",
+         schoolpopulation AS "SchoolPopulation", streetaddress AS "StreetAddress",
+         postalcode AS "PostalCode", cityname AS "CityName", provincename AS "ProvinceName"
+  FROM schools
+`;
+
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT s.SchoolID AS _id, s.SchoolID, s.SchoolName, s.SchoolPopulation, s.StreetAddress,
-           s.PostalCode, a.CityName, a.ProvinceName
-    FROM School s
-    JOIN Address a ON s.PostalCode = a.PostalCode
-  `);
-  res.json(result.recordset);
+  res.json((await pool.query(schoolSelect)).rows);
 });
 
 router.get('/:id', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query(`SELECT s.*, a.CityName, a.ProvinceName
-            FROM School s JOIN Address a ON s.PostalCode = a.PostalCode
-            WHERE s.SchoolID = @id`);
-  if (!result.recordset[0]) return res.status(404).json({ message: 'School not found' });
-  res.json(result.recordset[0]);
+  const result = await pool.query(schoolSelect + ' WHERE schoolid = $1', [req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ message: 'School not found' });
+  res.json(result.rows[0]);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN'), auditAction('CREATE', 'School'), async (req, res) => {
   const { schoolName, schoolPopulation, streetAddress, postalCode, cityName, provinceName } = req.body;
   const pool = await getPool();
-
-  // Upsert address
-  await pool.request()
-    .input('postalCode',   sql.VarChar(10),  postalCode.toUpperCase())
-    .input('cityName',     sql.VarChar(100), cityName)
-    .input('provinceName', sql.VarChar(100), provinceName)
-    .query(`IF NOT EXISTS (SELECT 1 FROM Address WHERE PostalCode = @postalCode)
-              INSERT INTO Address (PostalCode, CityName, ProvinceName) VALUES (@postalCode, @cityName, @provinceName)`);
-
-  const result = await pool.request()
-    .input('schoolName',       sql.VarChar(100), schoolName)
-    .input('schoolPopulation', sql.Int,          schoolPopulation || null)
-    .input('streetAddress',    sql.VarChar(100), streetAddress)
-    .input('postalCode',       sql.VarChar(10),  postalCode.toUpperCase())
-    .query(`INSERT INTO School (SchoolName, SchoolPopulation, StreetAddress, PostalCode)
-            OUTPUT INSERTED.*
-            VALUES (@schoolName, @schoolPopulation, @streetAddress, @postalCode)`);
-
-  res.status(201).json(result.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO schools (schoolname, schoolpopulation, streetaddress, postalcode, cityname, provincename)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING schoolid`,
+    [schoolName, schoolPopulation || null, streetAddress, postalCode.toUpperCase(), cityName, provinceName]
+  );
+  const full = await pool.query(schoolSelect + ' WHERE schoolid = $1', [result.rows[0].schoolid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN'), auditAction('UPDATE', 'School'), async (req, res) => {
   const { schoolName, schoolPopulation, streetAddress, postalCode, cityName, provinceName } = req.body;
   const pool = await getPool();
-
-  await pool.request()
-    .input('postalCode',   sql.VarChar(10),  postalCode.toUpperCase())
-    .input('cityName',     sql.VarChar(100), cityName)
-    .input('provinceName', sql.VarChar(100), provinceName)
-    .query(`IF NOT EXISTS (SELECT 1 FROM Address WHERE PostalCode = @postalCode)
-              INSERT INTO Address (PostalCode, CityName, ProvinceName) VALUES (@postalCode, @cityName, @provinceName)`);
-
-  await pool.request()
-    .input('id',               sql.Int,          req.params.id)
-    .input('schoolName',       sql.VarChar(100), schoolName)
-    .input('schoolPopulation', sql.Int,          schoolPopulation || null)
-    .input('streetAddress',    sql.VarChar(100), streetAddress)
-    .input('postalCode',       sql.VarChar(10),  postalCode.toUpperCase())
-    .query(`UPDATE School SET SchoolName=@schoolName, SchoolPopulation=@schoolPopulation,
-            StreetAddress=@streetAddress, PostalCode=@postalCode WHERE SchoolID=@id`);
-
-  const updated = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query('SELECT s.*, a.CityName, a.ProvinceName FROM School s JOIN Address a ON s.PostalCode=a.PostalCode WHERE SchoolID=@id');
-  res.json(updated.recordset[0]);
+  await pool.query(
+    `UPDATE schools SET schoolname=$1, schoolpopulation=$2, streetaddress=$3, postalcode=$4, cityname=$5, provincename=$6 WHERE schoolid=$7`,
+    [schoolName, schoolPopulation || null, streetAddress, postalCode.toUpperCase(), cityName, provinceName, req.params.id]
+  );
+  const full = await pool.query(schoolSelect + ' WHERE schoolid = $1', [req.params.id]);
+  res.json(full.rows[0]);
 });
 
 module.exports = router;

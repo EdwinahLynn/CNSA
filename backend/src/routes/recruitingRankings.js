@@ -1,42 +1,35 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }    = require('../middleware/auth');
 const { authorize }  = require('../middleware/roles');
 const { auditAction } = require('../middleware/audit');
 
 const select = `
-  SELECT rr.RankingID AS _id, rr.RankingID, rr.PlayerID, rr.RankingValue, rr.RankingYear,
-         p.FirstName, p.LastName
-  FROM RecruitingRanking rr
-  JOIN Player p ON rr.PlayerID = p.PlayerID
+  SELECT rr.rankingid AS "_id", rr.rankingid AS "RankingID", rr.playerid AS "PlayerID",
+         rr.rankingvalue AS "RankingValue", rr.rankingyear AS "RankingYear",
+         p.firstname AS "FirstName", p.lastname AS "LastName"
+  FROM recruitingranking rr JOIN players p ON rr.playerid=p.playerid
 `;
 
 router.get('/player/:playerId', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('playerId', sql.Int, req.params.playerId)
-    .query(select + ' WHERE rr.PlayerID = @playerId ORDER BY rr.RankingYear DESC');
-  res.json(result.recordset);
+  res.json((await pool.query(select + ' WHERE rr.playerid=$1 ORDER BY rr.rankingyear DESC', [req.params.playerId])).rows);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), auditAction('CREATE', 'RecruitingRanking'), async (req, res) => {
   const { playerId, rankingValue, rankingYear } = req.body;
   const pool = await getPool();
-  const result = await pool.request()
-    .input('playerId',     sql.Int, playerId)
-    .input('rankingValue', sql.Int, rankingValue)
-    .input('rankingYear',  sql.Int, rankingYear)
-    .query(`INSERT INTO RecruitingRanking (PlayerID, RankingValue, RankingYear)
-            OUTPUT INSERTED.RankingID
-            VALUES (@playerId, @rankingValue, @rankingYear)`);
-  const newId = result.recordset[0].RankingID;
-  const full  = await pool.request().input('id', sql.Int, newId).query(select + ' WHERE rr.RankingID = @id');
-  res.status(201).json(full.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO recruitingranking (playerid, rankingvalue, rankingyear) VALUES ($1,$2,$3) RETURNING rankingid`,
+    [playerId, rankingValue, rankingYear]
+  );
+  const full = await pool.query(select + ' WHERE rr.rankingid=$1', [result.rows[0].rankingid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.delete('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), async (req, res) => {
   const pool = await getPool();
-  await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM RecruitingRanking WHERE RankingID = @id');
+  await pool.query('DELETE FROM recruitingranking WHERE rankingid=$1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 

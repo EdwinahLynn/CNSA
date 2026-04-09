@@ -1,90 +1,71 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }    = require('../middleware/auth');
 const { authorize }  = require('../middleware/roles');
 const { auditAction } = require('../middleware/audit');
 
 const gameSelect = `
-  SELECT g.GameID AS _id, g.GameID, g.GameDate, g.HomeTeamScore, g.AwayTeamScore, g.Attendance,
-         g.HomeTeamID, hs.SchoolName AS HomeSchool,
-         g.AwayTeamID, as2.SchoolName AS AwaySchool,
-         g.StadiumID, st.StadiumName
-  FROM Game g
-  JOIN Team    ht  ON g.HomeTeamID = ht.TeamID
-  JOIN School  hs  ON ht.SchoolID  = hs.SchoolID
-  JOIN Team    awt ON g.AwayTeamID = awt.TeamID
-  JOIN School  as2 ON awt.SchoolID = as2.SchoolID
-  JOIN Stadium st  ON g.StadiumID  = st.StadiumID
+  SELECT g.gameid AS "_id", g.gameid AS "GameID", g.gamedate AS "GameDate",
+         g.hometeamscore AS "HomeTeamScore", g.awayteamscore AS "AwayTeamScore", g.attendance AS "Attendance",
+         g.hometeamid AS "HomeTeamID", hs.schoolname AS "HomeSchool",
+         g.awayteamid AS "AwayTeamID", as2.schoolname AS "AwaySchool",
+         g.stadiumid AS "StadiumID", st.stadiumname AS "StadiumName"
+  FROM games g
+  JOIN teams   ht  ON g.hometeamid = ht.teamid
+  JOIN schools hs  ON ht.schoolid  = hs.schoolid
+  JOIN teams   awt ON g.awayteamid = awt.teamid
+  JOIN schools as2 ON awt.schoolid = as2.schoolid
+  JOIN stadiums st ON g.stadiumid  = st.stadiumid
 `;
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  let query = gameSelect;
-  const request = pool.request();
   if (req.user.Role !== 'CNSA_ADMIN') {
-    query += ' WHERE ht.SchoolID = @schoolId OR awt.SchoolID = @schoolId';
-    request.input('schoolId', sql.Int, req.user.SchoolID);
+    return res.json((await pool.query(
+      gameSelect + ' WHERE ht.schoolid=$1 OR awt.schoolid=$1 ORDER BY g.gamedate DESC',
+      [req.user.SchoolID]
+    )).rows);
   }
-  query += ' ORDER BY g.GameDate DESC';
-  res.json((await request.query(query)).recordset);
+  res.json((await pool.query(gameSelect + ' ORDER BY g.gamedate DESC')).rows);
 });
 
 router.get('/:id', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query(gameSelect + ' WHERE g.GameID = @id');
-  if (!result.recordset[0]) return res.status(404).json({ message: 'Game not found' });
-
-  const stats = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query(`SELECT gs.*, p.FirstName, p.LastName, pos.PositionName
-            FROM GameStats gs
-            JOIN Player p ON gs.PlayerID = p.PlayerID
-            LEFT JOIN Position pos ON gs.PositionID = pos.PositionID
-            WHERE gs.GameID = @id`);
-
-  res.json({ ...result.recordset[0], playerStats: stats.recordset });
+  const result = await pool.query(gameSelect + ' WHERE g.gameid = $1', [req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ message: 'Game not found' });
+  const stats = await pool.query(
+    `SELECT gs.*, p.firstname AS "FirstName", p.lastname AS "LastName", pos.positionname AS "PositionName"
+     FROM gamestats gs
+     JOIN players p ON gs.playerid = p.playerid
+     LEFT JOIN positions pos ON gs.positionid = pos.positionid
+     WHERE gs.gameid = $1`,
+    [req.params.id]
+  );
+  res.json({ ...result.rows[0], playerStats: stats.rows });
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), auditAction('CREATE', 'Game'), async (req, res) => {
   const { homeTeamId, awayTeamId, stadiumId, gameDate, homeTeamScore, awayTeamScore, attendance } = req.body;
   const pool = await getPool();
-  const result = await pool.request()
-    .input('homeTeamId',    sql.Int,  homeTeamId)
-    .input('awayTeamId',    sql.Int,  awayTeamId)
-    .input('stadiumId',     sql.Int,  stadiumId)
-    .input('gameDate',      sql.Date, gameDate)
-    .input('homeTeamScore', sql.Int,  homeTeamScore || 0)
-    .input('awayTeamScore', sql.Int,  awayTeamScore || 0)
-    .input('attendance',    sql.Int,  attendance || null)
-    .query(`INSERT INTO Game (HomeTeamID, AwayTeamID, StadiumID, GameDate, HomeTeamScore, AwayTeamScore, Attendance)
-            OUTPUT INSERTED.GameID
-            VALUES (@homeTeamId, @awayTeamId, @stadiumId, @gameDate, @homeTeamScore, @awayTeamScore, @attendance)`);
-
-  const newId = result.recordset[0].GameID;
-  const full  = await pool.request().input('id', sql.Int, newId).query(gameSelect + ' WHERE g.GameID = @id');
-  res.status(201).json(full.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO games (hometeamid, awayteamid, stadiumid, gamedate, hometeamscore, awayteamscore, attendance)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING gameid`,
+    [homeTeamId, awayTeamId, stadiumId, gameDate, homeTeamScore||0, awayTeamScore||0, attendance||null]
+  );
+  const full = await pool.query(gameSelect + ' WHERE g.gameid = $1', [result.rows[0].gameid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), auditAction('UPDATE', 'Game'), async (req, res) => {
   const { homeTeamId, awayTeamId, stadiumId, gameDate, homeTeamScore, awayTeamScore, attendance } = req.body;
   const pool = await getPool();
-  await pool.request()
-    .input('id',            sql.Int,  req.params.id)
-    .input('homeTeamId',    sql.Int,  homeTeamId)
-    .input('awayTeamId',    sql.Int,  awayTeamId)
-    .input('stadiumId',     sql.Int,  stadiumId)
-    .input('gameDate',      sql.Date, gameDate)
-    .input('homeTeamScore', sql.Int,  homeTeamScore || 0)
-    .input('awayTeamScore', sql.Int,  awayTeamScore || 0)
-    .input('attendance',    sql.Int,  attendance || null)
-    .query(`UPDATE Game SET HomeTeamID=@homeTeamId, AwayTeamID=@awayTeamId, StadiumID=@stadiumId,
-            GameDate=@gameDate, HomeTeamScore=@homeTeamScore, AwayTeamScore=@awayTeamScore,
-            Attendance=@attendance WHERE GameID=@id`);
-
-  const full = await pool.request().input('id', sql.Int, req.params.id).query(gameSelect + ' WHERE g.GameID = @id');
-  res.json(full.recordset[0]);
+  await pool.query(
+    `UPDATE games SET hometeamid=$1, awayteamid=$2, stadiumid=$3, gamedate=$4,
+     hometeamscore=$5, awayteamscore=$6, attendance=$7 WHERE gameid=$8`,
+    [homeTeamId, awayTeamId, stadiumId, gameDate, homeTeamScore||0, awayTeamScore||0, attendance||null, req.params.id]
+  );
+  const full = await pool.query(gameSelect + ' WHERE g.gameid = $1', [req.params.id]);
+  res.json(full.rows[0]);
 });
 
 module.exports = router;

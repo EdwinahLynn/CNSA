@@ -1,56 +1,42 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }    = require('../middleware/auth');
 const { authorize }  = require('../middleware/roles');
 const { auditAction } = require('../middleware/audit');
 
 const select = `
-  SELECT ri.IncidentID AS _id, ri.IncidentID, ri.PlayerID, ri.Description, ri.IncidentDate,
-         p.FirstName, p.LastName
-  FROM RecruitingIncident ri
-  JOIN Player p ON ri.PlayerID = p.PlayerID
+  SELECT ri.incidentid AS "_id", ri.incidentid AS "IncidentID", ri.playerid AS "PlayerID",
+         ri.description AS "Description", ri.incidentdate AS "IncidentDate",
+         p.firstname AS "FirstName", p.lastname AS "LastName"
+  FROM recruitingincidents ri JOIN players p ON ri.playerid=p.playerid
 `;
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  const request = pool.request();
-  let query = select;
-  if (req.user.Role === 'COACH') {
-    query += ' WHERE p.CoachID = @coachId';
-    request.input('coachId', sql.Int, req.user.CoachID);
-  } else if (req.user.Role !== 'CNSA_ADMIN') {
-    query += ' WHERE p.SchoolID = @schoolId';
-    request.input('schoolId', sql.Int, req.user.SchoolID);
-  }
-  res.json((await request.query(query)).recordset);
+  if (req.user.Role === 'COACH') return res.json((await pool.query(select + ' WHERE p.coachid=$1', [req.user.CoachID])).rows);
+  if (req.user.Role !== 'CNSA_ADMIN') return res.json((await pool.query(select + ' WHERE p.schoolid=$1', [req.user.SchoolID])).rows);
+  res.json((await pool.query(select)).rows);
 });
 
 router.get('/player/:playerId', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('playerId', sql.Int, req.params.playerId)
-    .query(select + ' WHERE ri.PlayerID = @playerId ORDER BY ri.IncidentDate DESC');
-  res.json(result.recordset);
+  res.json((await pool.query(select + ' WHERE ri.playerid=$1 ORDER BY ri.incidentdate DESC', [req.params.playerId])).rows);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), auditAction('CREATE', 'RecruitingIncident'), async (req, res) => {
   const { playerId, description, incidentDate } = req.body;
   const pool = await getPool();
-  const result = await pool.request()
-    .input('playerId',     sql.Int,          playerId)
-    .input('description',  sql.VarChar(255), description)
-    .input('incidentDate', sql.Date,         incidentDate)
-    .query(`INSERT INTO RecruitingIncident (PlayerID, Description, IncidentDate)
-            OUTPUT INSERTED.IncidentID
-            VALUES (@playerId, @description, @incidentDate)`);
-  const newId = result.recordset[0].IncidentID;
-  const full  = await pool.request().input('id', sql.Int, newId).query(select + ' WHERE ri.IncidentID = @id');
-  res.status(201).json(full.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO recruitingincidents (playerid, description, incidentdate) VALUES ($1,$2,$3) RETURNING incidentid`,
+    [playerId, description, incidentDate]
+  );
+  const full = await pool.query(select + ' WHERE ri.incidentid=$1', [result.rows[0].incidentid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.delete('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), async (req, res) => {
   const pool = await getPool();
-  await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM RecruitingIncident WHERE IncidentID = @id');
+  await pool.query('DELETE FROM recruitingincidents WHERE incidentid=$1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 

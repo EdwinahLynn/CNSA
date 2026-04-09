@@ -1,92 +1,69 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }    = require('../middleware/auth');
 const { authorize }  = require('../middleware/roles');
 const { auditAction } = require('../middleware/audit');
 
 const injurySelect = `
-  SELECT i.InjuryID AS _id, i.InjuryID, i.InjuryStatus, i.InjuryCause, i.InjuryLocation, i.SurfaceType, i.Notes,
-         i.PlayerID, p.FirstName, p.LastName, p.SchoolID,
-         i.GameID, g.GameDate
-  FROM Injury i
-  JOIN Player p ON i.PlayerID = p.PlayerID
-  JOIN Game   g ON i.GameID   = g.GameID
+  SELECT i.injuryid AS "_id", i.injuryid AS "InjuryID", i.injurystatus AS "InjuryStatus",
+         i.injurycause AS "InjuryCause", i.injurylocation AS "InjuryLocation",
+         i.surfacetype AS "SurfaceType", i.notes AS "Notes",
+         i.playerid AS "PlayerID", p.firstname AS "FirstName", p.lastname AS "LastName", p.schoolid AS "SchoolID",
+         i.gameid AS "GameID", g.gamedate AS "GameDate"
+  FROM injuries i
+  JOIN players p ON i.playerid = p.playerid
+  JOIN games   g ON i.gameid   = g.gameid
 `;
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  const request = pool.request();
-  let query = injurySelect;
   if (req.user.Role === 'COACH') {
-    query += ' WHERE p.CoachID = @coachId';
-    request.input('coachId', sql.Int, req.user.CoachID);
+    return res.json((await pool.query(injurySelect + ' WHERE p.coachid = $1', [req.user.CoachID])).rows);
   } else if (req.user.Role !== 'CNSA_ADMIN') {
-    query += ' WHERE p.SchoolID = @schoolId';
-    request.input('schoolId', sql.Int, req.user.SchoolID);
+    return res.json((await pool.query(injurySelect + ' WHERE p.schoolid = $1', [req.user.SchoolID])).rows);
   }
-  res.json((await request.query(query)).recordset);
+  res.json((await pool.query(injurySelect)).rows);
 });
 
 router.get('/:id', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query(injurySelect + ' WHERE i.InjuryID = @id');
-  if (!result.recordset[0]) return res.status(404).json({ message: 'Injury not found' });
-  res.json(result.recordset[0]);
+  const result = await pool.query(injurySelect + ' WHERE i.injuryid = $1', [req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ message: 'Injury not found' });
+  res.json(result.rows[0]);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), auditAction('CREATE', 'Injury'), async (req, res) => {
   const { playerId, gameId, injuryStatus, injuryCause, injuryLocation, surfaceType, notes } = req.body;
-
+  const pool = await getPool();
   if (req.user.Role === 'COACH') {
-    const pool = await getPool();
-    const check = await pool.request().input('id', sql.Int, playerId).query('SELECT CoachID FROM Player WHERE PlayerID = @id');
-    if (!check.recordset[0] || check.recordset[0].CoachID !== req.user.CoachID) {
+    const check = await pool.query('SELECT coachid FROM players WHERE playerid=$1', [playerId]);
+    if (!check.rows[0] || check.rows[0].coachid !== req.user.CoachID) {
       return res.status(403).json({ message: 'Access denied — not your player' });
     }
   } else if (req.user.Role !== 'CNSA_ADMIN') {
-    const pool = await getPool();
-    const check = await pool.request().input('id', sql.Int, playerId).query('SELECT SchoolID FROM Player WHERE PlayerID = @id');
-    if (!check.recordset[0] || check.recordset[0].SchoolID !== req.user.SchoolID) {
+    const check = await pool.query('SELECT schoolid FROM players WHERE playerid=$1', [playerId]);
+    if (!check.rows[0] || check.rows[0].schoolid !== req.user.SchoolID) {
       return res.status(403).json({ message: 'Access denied' });
     }
   }
-
-  const pool = await getPool();
-  const result = await pool.request()
-    .input('playerId',       sql.Int,        playerId)
-    .input('gameId',         sql.Int,        gameId)
-    .input('injuryStatus',   sql.VarChar(50),  injuryStatus)
-    .input('injuryCause',    sql.VarChar(100), injuryCause || null)
-    .input('injuryLocation', sql.VarChar(100), injuryLocation || null)
-    .input('surfaceType',    sql.VarChar(20),  surfaceType || null)
-    .input('notes',          sql.Text,         notes || null)
-    .query(`INSERT INTO Injury (PlayerID, GameID, InjuryStatus, InjuryCause, InjuryLocation, SurfaceType, Notes)
-            OUTPUT INSERTED.InjuryID
-            VALUES (@playerId, @gameId, @injuryStatus, @injuryCause, @injuryLocation, @surfaceType, @notes)`);
-
-  const newId = result.recordset[0].InjuryID;
-  const full  = await pool.request().input('id', sql.Int, newId).query(injurySelect + ' WHERE i.InjuryID = @id');
-  res.status(201).json(full.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO injuries (playerid, gameid, injurystatus, injurycause, injurylocation, surfacetype, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING injuryid`,
+    [playerId, gameId, injuryStatus, injuryCause||null, injuryLocation||null, surfaceType||null, notes||null]
+  );
+  const full = await pool.query(injurySelect + ' WHERE i.injuryid = $1', [result.rows[0].injuryid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN'), auditAction('UPDATE', 'Injury'), async (req, res) => {
   const { injuryStatus, injuryCause, injuryLocation, surfaceType, notes } = req.body;
   const pool = await getPool();
-  await pool.request()
-    .input('id',             sql.Int,          req.params.id)
-    .input('injuryStatus',   sql.VarChar(50),  injuryStatus)
-    .input('injuryCause',    sql.VarChar(100), injuryCause || null)
-    .input('injuryLocation', sql.VarChar(100), injuryLocation || null)
-    .input('surfaceType',    sql.VarChar(20),  surfaceType || null)
-    .input('notes',          sql.Text,         notes || null)
-    .query(`UPDATE Injury SET InjuryStatus=@injuryStatus, InjuryCause=@injuryCause,
-            InjuryLocation=@injuryLocation, SurfaceType=@surfaceType, Notes=@notes
-            WHERE InjuryID=@id`);
-
-  const full = await pool.request().input('id', sql.Int, req.params.id).query(injurySelect + ' WHERE i.InjuryID = @id');
-  res.json(full.recordset[0]);
+  await pool.query(
+    `UPDATE injuries SET injurystatus=$1, injurycause=$2, injurylocation=$3, surfacetype=$4, notes=$5 WHERE injuryid=$6`,
+    [injuryStatus, injuryCause||null, injuryLocation||null, surfaceType||null, notes||null, req.params.id]
+  );
+  const full = await pool.query(injurySelect + ' WHERE i.injuryid = $1', [req.params.id]);
+  res.json(full.rows[0]);
 });
 
 module.exports = router;

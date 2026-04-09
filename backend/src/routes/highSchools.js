@@ -1,62 +1,39 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }   = require('../middleware/auth');
 const { authorize } = require('../middleware/roles');
 
 const select = `
-  SELECT hs.HighSchoolID AS _id, hs.HighSchoolID, hs.HighSchoolName,
-         hs.PostalCode, a.CityName, a.ProvinceName
-  FROM HighSchool hs
-  JOIN Address a ON hs.PostalCode = a.PostalCode
+  SELECT highschoolid AS "_id", highschoolid AS "HighSchoolID", highschoolname AS "HighSchoolName",
+         postalcode AS "PostalCode", cityname AS "CityName", provincename AS "ProvinceName"
+  FROM highschools
 `;
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  res.json((await pool.request().query(select)).recordset);
+  res.json((await pool.query(select)).rows);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const { highSchoolName, postalCode, cityName, provinceName } = req.body;
   const pool = await getPool();
-
-  await pool.request()
-    .input('postalCode',   sql.VarChar(10),  postalCode.toUpperCase())
-    .input('cityName',     sql.VarChar(100), cityName)
-    .input('provinceName', sql.VarChar(100), provinceName)
-    .query(`IF NOT EXISTS (SELECT 1 FROM Address WHERE PostalCode = @postalCode)
-              INSERT INTO Address (PostalCode, CityName, ProvinceName) VALUES (@postalCode, @cityName, @provinceName)`);
-
-  const result = await pool.request()
-    .input('highSchoolName', sql.VarChar(100), highSchoolName)
-    .input('postalCode',     sql.VarChar(10),  postalCode.toUpperCase())
-    .query(`INSERT INTO HighSchool (HighSchoolName, PostalCode)
-            OUTPUT INSERTED.HighSchoolID
-            VALUES (@highSchoolName, @postalCode)`);
-
-  const newId = result.recordset[0].HighSchoolID;
-  const full  = await pool.request().input('id', sql.Int, newId).query(select + ' WHERE hs.HighSchoolID = @id');
-  res.status(201).json(full.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO highschools (highschoolname, postalcode, cityname, provincename) VALUES ($1,$2,$3,$4) RETURNING highschoolid`,
+    [highSchoolName, postalCode?.toUpperCase(), cityName, provinceName]
+  );
+  const full = await pool.query(select + ' WHERE highschoolid=$1', [result.rows[0].highschoolid]);
+  res.status(201).json(full.rows[0]);
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const { highSchoolName, postalCode, cityName, provinceName } = req.body;
   const pool = await getPool();
-
-  await pool.request()
-    .input('postalCode',   sql.VarChar(10),  postalCode.toUpperCase())
-    .input('cityName',     sql.VarChar(100), cityName)
-    .input('provinceName', sql.VarChar(100), provinceName)
-    .query(`IF NOT EXISTS (SELECT 1 FROM Address WHERE PostalCode = @postalCode)
-              INSERT INTO Address (PostalCode, CityName, ProvinceName) VALUES (@postalCode, @cityName, @provinceName)`);
-
-  await pool.request()
-    .input('id',             sql.Int,          req.params.id)
-    .input('highSchoolName', sql.VarChar(100), highSchoolName)
-    .input('postalCode',     sql.VarChar(10),  postalCode.toUpperCase())
-    .query(`UPDATE HighSchool SET HighSchoolName=@highSchoolName, PostalCode=@postalCode WHERE HighSchoolID=@id`);
-
-  const full = await pool.request().input('id', sql.Int, req.params.id).query(select + ' WHERE hs.HighSchoolID = @id');
-  res.json(full.recordset[0]);
+  await pool.query(
+    `UPDATE highschools SET highschoolname=$1, postalcode=$2, cityname=$3, provincename=$4 WHERE highschoolid=$5`,
+    [highSchoolName, postalCode?.toUpperCase(), cityName, provinceName, req.params.id]
+  );
+  const full = await pool.query(select + ' WHERE highschoolid=$1', [req.params.id]);
+  res.json(full.rows[0]);
 });
 
 module.exports = router;

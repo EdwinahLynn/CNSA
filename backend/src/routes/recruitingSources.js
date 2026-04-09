@@ -1,20 +1,27 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }   = require('../middleware/auth');
 const { authorize } = require('../middleware/roles');
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  res.json((await pool.request().query('SELECT RecruitSourceID AS _id, RecruitSourceID, SourceName, SourceType FROM RecruitingSource')).recordset);
+  const result = await pool.query(
+    `SELECT recruitsourceid AS "_id", recruitsourceid AS "RecruitSourceID",
+            sourcename AS "SourceName", sourcetype AS "SourceType"
+     FROM recruitingsource`
+  );
+  res.json(result.rows);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('sourceName', sql.VarChar(100), req.body.sourceName)
-    .input('sourceType', sql.VarChar(50),  req.body.sourceType)
-    .query('INSERT INTO RecruitingSource (SourceName, SourceType) OUTPUT INSERTED.* VALUES (@sourceName, @sourceType)');
-  res.status(201).json(result.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO recruitingsource (sourcename, sourcetype) VALUES ($1, $2)
+     RETURNING recruitsourceid AS "_id", recruitsourceid AS "RecruitSourceID",
+               sourcename AS "SourceName", sourcetype AS "SourceType"`,
+    [req.body.sourceName, req.body.sourceType]
+  );
+  res.status(201).json(result.rows[0]);
 });
 
 module.exports = router;

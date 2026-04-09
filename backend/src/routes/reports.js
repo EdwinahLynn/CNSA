@@ -1,89 +1,67 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }   = require('../middleware/auth');
 const { authorize } = require('../middleware/roles');
 
-// GET /api/reports/audit
 router.get('/audit', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT TOP 500 al.AuditID, al.ActionType, al.AffectedEntity, al.AffectedID,
-           al.Details, al.Timestamp, u.Username, u.Role
-    FROM AuditLog al
-    JOIN Users u ON al.UserID = u.UserID
-    ORDER BY al.Timestamp DESC
+  const result = await pool.query(`
+    SELECT al.auditid AS "_id", al.actiontype AS "ActionType", al.affectedentity AS "AffectedEntity",
+           al.affectedid AS "AffectedID", al.details AS "Details", al.timestamp AS "Timestamp",
+           u.username AS "Username", u.role AS "Role"
+    FROM auditlog al JOIN users u ON al.userid = u.userid
+    ORDER BY al.timestamp DESC LIMIT 500
   `);
-  res.json(result.recordset);
+  res.json(result.rows);
 });
 
-// GET /api/reports/players-by-school
 router.get('/players-by-school', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT s.SchoolName, COUNT(*) AS Total,
-           SUM(CASE WHEN p.Status = 'Active' THEN 1 ELSE 0 END) AS Active
-    FROM Player p
-    JOIN School s ON p.SchoolID = s.SchoolID
-    GROUP BY s.SchoolID, s.SchoolName
-    ORDER BY Total DESC
+  const result = await pool.query(`
+    SELECT s.schoolname AS "SchoolName", COUNT(*) AS "Total",
+           SUM(CASE WHEN p.status='Active' THEN 1 ELSE 0 END) AS "Active"
+    FROM players p JOIN schools s ON p.schoolid=s.schoolid
+    GROUP BY s.schoolid, s.schoolname ORDER BY "Total" DESC
   `);
-  res.json(result.recordset);
+  res.json(result.rows);
 });
 
-// GET /api/reports/injuries-summary
 router.get('/injuries-summary', protect, authorize('CNSA_ADMIN', 'SCHOOL_ADMIN', 'COACH'), async (req, res) => {
   const pool = await getPool();
-  const request = pool.request();
-  let query = `
-    SELECT i.InjuryStatus AS _id, COUNT(*) AS count
-    FROM Injury i
-    JOIN Player p ON i.PlayerID = p.PlayerID
-  `;
-  if (req.user.Role === 'COACH') {
-    query += ' WHERE p.CoachID = @coachId';
-    request.input('coachId', sql.Int, req.user.CoachID);
-  } else if (req.user.Role !== 'CNSA_ADMIN') {
-    query += ' WHERE p.SchoolID = @schoolId';
-    request.input('schoolId', sql.Int, req.user.SchoolID);
-  }
-  query += ' GROUP BY i.InjuryStatus';
-  res.json((await request.query(query)).recordset);
+  let query = `SELECT i.injurystatus AS "_id", COUNT(*) AS "count" FROM injuries i JOIN players p ON i.playerid=p.playerid`;
+  const params = [];
+  if (req.user.Role === 'COACH') { query += ' WHERE p.coachid=$1'; params.push(req.user.CoachID); }
+  else if (req.user.Role !== 'CNSA_ADMIN') { query += ' WHERE p.schoolid=$1'; params.push(req.user.SchoolID); }
+  query += ' GROUP BY i.injurystatus';
+  res.json((await pool.query(query, params)).rows);
 });
 
-// GET /api/reports/my-players (COACH only)
 router.get('/my-players', protect, authorize('COACH'), async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request()
-    .input('coachId', sql.Int, req.user.CoachID)
-    .query(`
-      SELECT p.PlayerID AS _id, p.FirstName, p.LastName, p.Status, p.HighSchool,
-             s.SchoolName,
-             (SELECT STRING_AGG(pos.PositionName, ', ')
-              FROM PlayerPosition pp JOIN Position pos ON pp.PositionID = pos.PositionID
-              WHERE pp.PlayerID = p.PlayerID) AS Positions,
-             (SELECT COUNT(*) FROM Injury i WHERE i.PlayerID = p.PlayerID) AS InjuryCount,
-             (SELECT COUNT(*) FROM RecruitingIncident ri WHERE ri.PlayerID = p.PlayerID) AS IncidentCount
-      FROM Player p
-      JOIN School s ON p.SchoolID = s.SchoolID
-      WHERE p.CoachID = @coachId
-      ORDER BY p.LastName, p.FirstName
-    `);
-  res.json(result.recordset);
+  const result = await pool.query(`
+    SELECT p.playerid AS "_id", p.firstname AS "FirstName", p.lastname AS "LastName",
+           p.status AS "Status", p.highschool AS "HighSchool", s.schoolname AS "SchoolName",
+           (SELECT STRING_AGG(pos.positionname, ', ')
+            FROM playerposition pp JOIN positions pos ON pp.positionid=pos.positionid
+            WHERE pp.playerid=p.playerid) AS "Positions",
+           (SELECT COUNT(*) FROM injuries i WHERE i.playerid=p.playerid)::int AS "InjuryCount",
+           (SELECT COUNT(*) FROM recruitingincidents ri WHERE ri.playerid=p.playerid)::int AS "IncidentCount"
+    FROM players p JOIN schools s ON p.schoolid=s.schoolid
+    WHERE p.coachid=$1 ORDER BY p.lastname, p.firstname
+  `, [req.user.CoachID]);
+  res.json(result.rows);
 });
 
-// GET /api/reports/top-scorers
 router.get('/top-scorers', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT TOP 20 p.PlayerID AS _id, p.FirstName, p.LastName,
-           SUM(gs.Goals)   AS totalGoals,
-           SUM(gs.Assists) AS totalAssists
-    FROM GameStats gs
-    JOIN Player p ON gs.PlayerID = p.PlayerID
-    GROUP BY p.PlayerID, p.FirstName, p.LastName
-    ORDER BY totalGoals DESC
+  const result = await pool.query(`
+    SELECT p.playerid AS "_id", p.firstname AS "FirstName", p.lastname AS "LastName",
+           SUM(gs.goals) AS "TotalGoals", SUM(gs.assists) AS "TotalAssists"
+    FROM gamestats gs JOIN players p ON gs.playerid=p.playerid
+    GROUP BY p.playerid, p.firstname, p.lastname
+    ORDER BY "TotalGoals" DESC LIMIT 20
   `);
-  res.json(result.recordset);
+  res.json(result.rows);
 });
 
 module.exports = router;

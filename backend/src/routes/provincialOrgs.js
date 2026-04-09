@@ -1,38 +1,39 @@
 const router = require('express').Router();
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 const { protect }   = require('../middleware/auth');
 const { authorize } = require('../middleware/roles');
 
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
-  const result = await pool.request().query(
-    'SELECT OrganizationID AS _id, OrganizationID, OrganizationName FROM ProvincialOrganization'
+  const result = await pool.query(
+    `SELECT organizationid AS "_id", organizationid AS "OrganizationID", organizationname AS "OrganizationName"
+     FROM provincialorganization`
   );
-  res.json(result.recordset);
+  res.json(result.rows);
 });
 
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
-  const { organizationName } = req.body;
   const pool = await getPool();
-  const result = await pool.request()
-    .input('organizationName', sql.VarChar(100), organizationName)
-    .query(`INSERT INTO ProvincialOrganization (OrganizationName)
-            OUTPUT INSERTED.OrganizationID, INSERTED.OrganizationName
-            VALUES (@organizationName)`);
-  res.status(201).json(result.recordset[0]);
+  const result = await pool.query(
+    `INSERT INTO provincialorganization (organizationname) VALUES ($1)
+     RETURNING organizationid AS "_id", organizationid AS "OrganizationID", organizationname AS "OrganizationName"`,
+    [req.body.organizationName]
+  );
+  res.status(201).json(result.rows[0]);
 });
 
 router.put('/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
-  const { organizationName } = req.body;
   const pool = await getPool();
-  await pool.request()
-    .input('id',               sql.Int,          req.params.id)
-    .input('organizationName', sql.VarChar(100), organizationName)
-    .query('UPDATE ProvincialOrganization SET OrganizationName=@organizationName WHERE OrganizationID=@id');
-  const result = await pool.request()
-    .input('id', sql.Int, req.params.id)
-    .query('SELECT OrganizationID AS _id, OrganizationID, OrganizationName FROM ProvincialOrganization WHERE OrganizationID=@id');
-  res.json(result.recordset[0]);
+  await pool.query(
+    'UPDATE provincialorganization SET organizationname=$1 WHERE organizationid=$2',
+    [req.body.organizationName, req.params.id]
+  );
+  const result = await pool.query(
+    `SELECT organizationid AS "_id", organizationid AS "OrganizationID", organizationname AS "OrganizationName"
+     FROM provincialorganization WHERE organizationid=$1`,
+    [req.params.id]
+  );
+  res.json(result.rows[0]);
 });
 
 module.exports = router;
