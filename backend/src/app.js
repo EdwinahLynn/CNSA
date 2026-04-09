@@ -35,7 +35,10 @@ const camelizeKeys = (obj) => {
 const app = express();
 connectDB();
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ['http://localhost:5173'];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 // Auto-camelCase all JSON responses
