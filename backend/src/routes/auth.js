@@ -143,7 +143,7 @@ router.put('/users/:id', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const updated = await pool.query(
     `SELECT u.userid AS "_id", u.userid AS "UserID", u.username AS "Username", u.role AS "Role",
             u.isactive AS "IsActive", u.schoolid AS "SchoolID", u.coachid AS "CoachID", s.schoolname AS "SchoolName"
-     FROM users u LEFT JOIN school s ON u.schoolid = s.schoolid WHERE u.userid = $1`,
+     FROM users u LEFT JOIN schools s ON u.schoolid = s.schoolid WHERE u.userid = $1`,
     [req.params.id]
   );
   res.json(updated.rows[0]);
@@ -169,7 +169,7 @@ router.get('/users', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const result = await pool.query(
     `SELECT u.userid AS "_id", u.userid AS "UserID", u.username AS "Username", u.role AS "Role",
             u.isactive AS "IsActive", u.schoolid AS "SchoolID", u.coachid AS "CoachID", s.schoolname AS "SchoolName"
-     FROM users u LEFT JOIN school s ON u.schoolid = s.schoolid`
+     FROM users u LEFT JOIN schools s ON u.schoolid = s.schoolid`
   );
   res.json(result.rows);
 });
