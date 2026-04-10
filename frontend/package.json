@@ -14,7 +14,7 @@
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.22.3",
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^8.0.2"
+    "vite": "^5.4.0"
   },
   "devDependencies": {}
 }
