@@ -18,7 +18,8 @@ router.get('/audit', protect, authorize('CNSA_ADMIN'), async (req, res) => {
 router.get('/players-by-school', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
   const result = await pool.query(`
-    SELECT s.schoolname AS "SchoolName", COUNT(*) AS "Total",
+    SELECT s.schoolid AS "_id", s.schoolname AS "SchoolName",
+           COUNT(*) AS "Total",
            SUM(CASE WHEN p.status='Active' THEN 1 ELSE 0 END) AS "Active"
     FROM players p JOIN schools s ON p.schoolid=s.schoolid
     GROUP BY s.schoolid, s.schoolname ORDER BY "Total" DESC
