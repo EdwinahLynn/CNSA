@@ -6,7 +6,7 @@ const { authorize } = require('../middleware/roles');
 router.get('/', protect, async (req, res) => {
   const pool = await getPool();
   const result = await pool.query(
-    `SELECT positionid AS "_id", positionid AS "PositionID", positionname AS "PositionName" FROM position`
+    `SELECT positionid AS "_id", positionid AS "PositionID", positionname AS "PositionName" FROM positions`
   );
   res.json(result.rows);
 });
@@ -14,7 +14,7 @@ router.get('/', protect, async (req, res) => {
 router.post('/', protect, authorize('CNSA_ADMIN'), async (req, res) => {
   const pool = await getPool();
   const result = await pool.query(
-    `INSERT INTO position (positionname) VALUES ($1)
+    `INSERT INTO positions (positionname) VALUES ($1)
      RETURNING positionid AS "_id", positionid AS "PositionID", positionname AS "PositionName"`,
     [req.body.positionName]
   );
